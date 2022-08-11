@@ -9,6 +9,12 @@ const trainingConfig = ref({
   epoch: 20,
   unit: 100,
 })
+const directions = {
+  up: 'up',
+  left: 'left',
+  right: 'right',
+  down: 'down',
+}
 </script>
 
 <template>
@@ -110,91 +116,17 @@ const trainingConfig = ref({
 
       <div class="panel joystick-panel">
         <div class="panel-row panel-row-top">
-          <div class="panel-cell panel-cell-left panel-cell-fill">
-            <p class="help-text">
-              Click to add the <br>
-              current camera <br>
-              view as an example <br>
-              for that control
-            </p>
-          </div><!-- ./panel-cell -->
-
-          <div class="panel-cell panel-cell-center">
-            <div class="thumb-box">
-              <div class="thumb-box-outer">
-                <div class="thumb-box-inner">
-                  <canvas id="up-thumb" class="thumb" width="224" height="224" />
-                </div>
-                <button id="up" class="record-button">
-                  <span>Add Sample</span>
-                </button>
-              </div>
-              <p>
-                <span id="up-total">0</span> examples
-              </p>
-            </div>
-          </div><!-- ./panel-cell -->
-
-          <div class="panel-cell panel-cell-right panel-cell-fill" /><!-- ./panel-cell -->
+          <ThumbBox :direction="directions.up" />
         </div><!-- /.panel-row -->
         <div class="panel-row panel-row-middle">
-          <div class="panel-cell panel-cell-left">
-            <div class="thumb-box">
-              <div class="thumb-box-outer">
-                <div class="thumb-box-inner">
-                  <canvas id="left-thumb" class="thumb" width="224" height="224" />
-                </div>
-                <button id="left" class="record-button">
-                  <span>Add Sample</span>
-                </button>
-              </div>
-              <p>
-                <span id="left-total">0</span> examples
-              </p>
-            </div>
-          </div><!-- ./panel-cell -->
-
+          <ThumbBox :direction="directions.left" />
           <div class="panel-cell panel-cell-center panel-cell-fill">
             <img height="108" width="129" src="../assets/joystick.png">
           </div><!-- ./panel-cell -->
-
-          <div class="panel-cell panel-cell-right">
-            <div class="thumb-box">
-              <div class="thumb-box-outer">
-                <div class="thumb-box-inner">
-                  <canvas id="right-thumb" class="thumb" width="224" height="224" />
-                </div>
-                <button id="right" class="record-button">
-                  <span>Add Sample</span>
-                </button>
-              </div>
-              <p>
-                <span id="right-total">0</span> examples
-              </p>
-            </div>
-          </div><!-- ./panel-cell -->
+          <ThumbBox :direction="directions.right" />
         </div><!-- /.panel-row -->
-
         <div class="panel-row panel-row-bottom">
-          <div class="panel-cell panel-cell-left panel-cell-fill" /><!-- ./panel-cell -->
-
-          <div class="panel-cell panel-cell-center">
-            <div class="thumb-box">
-              <div class="thumb-box-outer">
-                <div class="thumb-box-inner">
-                  <canvas id="down-thumb" class="thumb" width="224" height="224" />
-                </div>
-                <button id="down" class="record-button">
-                  <span>Add Sample</span>
-                </button>
-              </div>
-              <p>
-                <span id="down-total">0</span> examples
-              </p>
-            </div>
-          </div><!-- ./panel-cell -->
-
-          <div class="panel-cell panel-cell-right panel-cell-fill" /><!-- ./panel-cell -->
+          <ThumbBox :direction="directions.down" />
         </div><!-- /.panel-row -->
       </div><!-- /.panel -->
     </div><!-- /#controller -->
@@ -497,67 +429,8 @@ header b {
   height: 132px;
 }
 
-.thumb-box {
-  display: inline-block;
-}
-
 .panel-row-middle .thumb-box {
   margin-top: 18px;
-}
-
-.thumb-box-outer {
-  background: black;
-  border: 1px solid #585858;
-  border-radius: 4px;
-  box-sizing: border-box;
-  display: inline-block;
-  padding: 9px;
-  position: relative;
-  transition: box-shadow 0.3s;
-}
-
-[data-active="up"] .panel-row-top .thumb-box-outer,
-[data-active="down"] .panel-row-bottom .thumb-box-outer,
-[data-active="left"] .panel-cell-left .thumb-box-outer,
-[data-active="right"] .panel-cell-right .thumb-box-outer {
-  box-shadow: 0 0 4px 4px #ffaa00;
-}
-
-.thumb-box-inner {
-  border: 1px solid #585858;
-  border-radius: 4px;
-  box-sizing: border-box;
-  display: flex;
-  justify-content: center;
-  overflow: hidden;
-  width: 66px;
-}
-
-.thumb {
-  height: 66px;
-  transform: scaleX(-1);
-}
-
-.thumb-box-outer .record-button {
-  height: 100%;
-  left: 0;
-  position: absolute;
-  top: 0;
-  width: 100%;
-}
-
-.thumb-box-outer .record-button span {
-  background: #111;
-  border: 1px solid #585858;
-  border-radius: 3px;
-  bottom: 9px;
-  color: #f8f8f8;
-  display: block;
-  font-size: 8px;
-  left: 9px;
-  position: absolute;
-  right: 9px;
-  opacity: 0.5;
 }
 
 /** Footer. **/
