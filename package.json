@@ -31,6 +31,7 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
+    "@tensorflow/tfjs": "^3.19.0",
     "@vueuse/core": "^8.9.4",
     "vue": "^3.2.37",
     "vue-i18n": "^9.2.0"
