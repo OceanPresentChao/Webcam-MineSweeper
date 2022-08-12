@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { init } from '@/utils/logic'
 const learningRateOptions = [0.00001, 0.0001, 0.01, 0.03]
 const batchSizeOptions = [0.05, 0.1, 0.4, 1]
 const epochOptions = [10, 20, 40]
@@ -15,10 +16,34 @@ const directions = {
   right: 'right',
   down: 'down',
 }
+
+const webcamRef = ref<HTMLVideoElement | null>(null)
+const errorInfoRef = ref<HTMLDivElement | null>(null)
+let isMouseDown = false
+function addExample(direction: string) {
+  isMouseDown = true
+  console.log(direction)
+}
+
+function cancelCapture() {
+  isMouseDown = false
+  console.log('cancel')
+}
+
+onMounted(() => {
+  init(webcamRef.value!, errorInfoRef.value!)
+})
 </script>
 
 <template>
+  <header>
+    Turn your <b>Web Camera</b> into a controller using a <b>Neural Network</b>.
+  </header>
   <div>
+    <div id="no-webcam" ref="errorInfoRef">
+      No webcam found. <br>
+      To use this demo, use a device with a webcam.
+    </div>
     <div id="status">
       Loading mobilenet...
     </div>
@@ -108,7 +133,7 @@ const directions = {
 
           <div class="webcam-box-outer">
             <div class="webcam-box-inner">
-              <video id="webcam" autoplay playsinline muted width="224" height="224" />
+              <video ref="webcamRef" autoplay playsinline muted width="224" height="224" />
             </div>
           </div>
         </div><!-- /.panel-row -->
@@ -116,17 +141,17 @@ const directions = {
 
       <div class="panel joystick-panel">
         <div class="panel-row panel-row-top">
-          <ThumbBox :direction="directions.up" />
+          <ThumbBox :direction="directions.up" @capture="addExample" @cancel="cancelCapture" />
         </div><!-- /.panel-row -->
         <div class="panel-row panel-row-middle">
-          <ThumbBox :direction="directions.left" />
+          <ThumbBox :direction="directions.left" @capture="addExample" @cancel="cancelCapture" />
           <div class="panel-cell panel-cell-center panel-cell-fill">
             <img height="108" width="129" src="../assets/joystick.png">
           </div><!-- ./panel-cell -->
-          <ThumbBox :direction="directions.right" />
+          <ThumbBox :direction="directions.right" @capture="addExample" @cancel="cancelCapture" />
         </div><!-- /.panel-row -->
         <div class="panel-row panel-row-bottom">
-          <ThumbBox :direction="directions.down" />
+          <ThumbBox :direction="directions.down" @capture="addExample" @cancel="cancelCapture" />
         </div><!-- /.panel-row -->
       </div><!-- /.panel -->
     </div><!-- /#controller -->
@@ -177,48 +202,6 @@ header b {
   font-weight: 300;
   margin: 12px 0;
   text-align: center;
-}
-
-/* Rules for the pacman game. */
-#pacman-container {
-  background: black;
-  padding: 25px 0 40px;
-}
-
-#logo {
-  background: url('https://storage.googleapis.com/tfjs-examples/assets/webcam-transfer-learning/bck.png');
-  background-repeat: no-repeat;
-  background-position-y: -5px;
-  margin: 0 auto;
-  position: relative;
-  transform: scale(1.2);
-  width: 554px;
-}
-
-#logo #pcm-c {
-  border-top: none;
-  margin: 0 auto;
-  position: relative;
-  top: 20px;
-}
-
-#logo-l {
-  background: #990;
-  display: none;
-  height: 2px;
-  left: 177px;
-  overflow: hidden;
-  position: absolute;
-  top: 157px;
-  width: 200px;
-}
-
-#logo-b {
-  background: #ff0;
-  height: 8px;
-  left: 0;
-  position: absolute;
-  width: 0;
 }
 
 /** Controls. **/

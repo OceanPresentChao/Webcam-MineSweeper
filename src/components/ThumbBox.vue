@@ -2,6 +2,13 @@
 const props = defineProps({
   direction: String,
 })
+
+const emits = defineEmits(['capture', 'cancel'])
+
+function handleClick() {
+  if (props.direction)
+    emits('capture', props.direction)
+}
 </script>
 
 <template>
@@ -11,7 +18,7 @@ const props = defineProps({
         <div class="thumb-box-inner">
           <canvas class="thumb" width="224" height="224" />
         </div>
-        <button class="record-button">
+        <button class="record-button" @mousedown="handleClick" @mouseup="$emit('cancel')">
           <span>Add {{ props.direction }} Sample</span>
         </button>
       </div>
