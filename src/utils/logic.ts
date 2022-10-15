@@ -17,8 +17,7 @@ export async function init(videoEl: HTMLVideoElement, errorEl: HTMLDivElement) {
     webcam = await tf.data.webcam(videoEl)
   }
   catch (e) {
-    // eslint-disable-next-line no-console
-    console.log(e)
+    console.error(e)
     errorEl.style.display = 'block'
   }
   truncatedMobileNet = await loadTruncatedMobileNet()
@@ -29,4 +28,17 @@ export async function init(videoEl: HTMLVideoElement, errorEl: HTMLDivElement) {
   const screenShot = await webcam.capture()
   truncatedMobileNet.predict(screenShot.expandDims(0))
   screenShot.dispose()
+}
+
+export async function addExample() {
+  const img = await getImage()
+  img.dispose()
+}
+
+async function getImage(): Promise<tf.Tensor3D> {
+  const img = await webcam.capture()
+  const processedImg
+      = tf.tidy(() => img.expandDims(0).toFloat().div(127).sub(1))
+  img.dispose()
+  return processedImg
 }

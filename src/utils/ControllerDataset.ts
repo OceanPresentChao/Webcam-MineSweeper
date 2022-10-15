@@ -1,5 +1,5 @@
 import * as tf from '@tensorflow/tfjs'
-
+import type { OperationLabel } from '@/utils/type'
 /**
  * A dataset for webcam controls which allows the user to add example Tensors
  * for particular labels. This object will concat them into two large xs and ys.
@@ -20,10 +20,9 @@ export class ControllerDataset {
    *     an activation, or any other type of Tensor.
    * @param {number} label The label of the example. Should be a number.
    */
-  addExample(example: tf.Tensor, label: number) {
+  addExample(example: tf.Tensor, label: OperationLabel) {
     // One-hot encode the label.
-    const y = tf.tidy(
-      () => tf.oneHot(tf.tensor1d([label]).toInt(), this.numClasses))
+    const y = tf.tidy(() => tf.oneHot(tf.tensor1d([label]).toInt(), this.numClasses))
 
     if (this.xs === null || this.ys === null) {
       // For the first example that gets added, keep example and y so that the

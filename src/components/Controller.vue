@@ -1,435 +1,161 @@
 <script setup lang="ts">
-import { init } from '@/utils/logic'
-const learningRateOptions = [0.00001, 0.0001, 0.01, 0.03]
-const batchSizeOptions = [0.05, 0.1, 0.4, 1]
-const epochOptions = [10, 20, 40]
-const unitOptions = [10, 100, 200]
-const trainingConfig = ref({
-  learningRate: 0.0001,
-  batchSize: 0.4,
-  epoch: 20,
-  unit: 100,
+import * as tf from '@tensorflow/tfjs'
+import { ControllerDataset } from '@/utils/ControllerDataset'
+import type { Await, OperationLabel } from '@/utils/type'
+const videoRef = ref<HTMLVideoElement | null>(null)
+const novideoRef = ref<HTMLDivElement | null>(null)
+let webcam: Await<ReturnType<typeof tf.data.webcam>> | null = null
+let truncatedModel: null | tf.LayersModel = null
+let sequentialModel: null | tf.Sequential = null
+const NUM_CLASSES = 5
+const controllerDataset = new ControllerDataset(NUM_CLASSES)
+const trainSetting = ref({
+  units: 1,
+  learningRate: 0.3,
+  batchSize: 10,
+  epochs: 5,
+  status: '',
 })
-const directions = {
-  up: 'up',
-  left: 'left',
-  right: 'right',
-  down: 'down',
-}
-
-const webcamRef = ref<HTMLVideoElement | null>(null)
-const errorInfoRef = ref<HTMLDivElement | null>(null)
-let isMouseDown = false
-function addExample(direction: string) {
-  isMouseDown = true
-  console.log(direction)
-}
-
-function cancelCapture() {
-  isMouseDown = false
-  console.log('cancel')
-}
-
-onMounted(() => {
-  init(webcamRef.value!, errorInfoRef.value!)
+onMounted(async () => {
+  try {
+    if (videoRef.value) {
+      webcam = await tf.data.webcam(videoRef.value)
+      truncatedModel = await loadTruncatedMobileNet()
+    }
+  }
+  catch (e) {
+    if (novideoRef.value)
+      novideoRef.value.style.display = 'block'
+    console.error(e)
+  }
 })
+
+async function loadTruncatedMobileNet() {
+  const mobilenet = await tf.loadLayersModel(
+    'https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json')
+  const layer = mobilenet.getLayer('conv_pw_13_relu')
+  return tf.model({
+    inputs: mobilenet.input,
+    outputs: layer.output,
+  })
+}
+
+async function getImage() {
+  if (webcam) {
+    const image = await webcam.capture()
+    const processedImg = tf.tidy(() => image.expandDims(0).toFloat().div(127).sub(1))
+    image.dispose()
+    return processedImg
+  }
+}
+
+async function addExample(label: OperationLabel) {
+  if (webcam && truncatedModel) {
+    const image = await webcam.capture()
+    const example = truncatedModel.predict(image)
+    if (example instanceof tf.Tensor) {
+      controllerDataset.addExample(example, label)
+      image.dispose()
+    }
+  }
+}
+
+async function train() {
+  if (!controllerDataset.xs || !controllerDataset.ys)
+    throw new Error('Add some examples before training!')
+  if (!truncatedModel)
+    throw new Error('truncatedModel not exist')
+  // Creates a 2-layer fully connected model. By creating a separate model,
+  // rather than adding layers to the mobilenet model, we "freeze" the weights
+  // of the mobilenet model, and only train weights from the new model.
+  sequentialModel = tf.sequential({
+    layers: [
+      // Flattens the input to a vector so we can use it in a dense layer. While
+      // technically a layer, this only performs a reshape (and has no training
+      // parameters).
+      tf.layers.flatten({
+        inputShape: truncatedModel.outputs[0].shape.slice(1),
+      }),
+      // Layer 1.
+      tf.layers.dense({
+        units: trainSetting.value.units,
+        activation: 'relu',
+        kernelInitializer: 'varianceScaling',
+        useBias: true,
+      }),
+      // Layer 2. The number of units of the last layer should correspond
+      // to the number of classes we want to predict.
+      tf.layers.dense({
+        units: NUM_CLASSES,
+        kernelInitializer: 'varianceScaling',
+        useBias: false,
+        activation: 'softmax',
+      }),
+    ],
+  })
+
+  // Creates the optimizers which drives training of the model.
+  const optimizer = tf.train.adam(trainSetting.value.learningRate)
+  // We use categoricalCrossentropy which is the loss function we use for
+  // categorical classification which measures the error between our predicted
+  // probability distribution over classes (probability that an input is of each
+  // class), versus the label (100% probability in the true class)>
+  sequentialModel.compile({ optimizer, loss: 'categoricalCrossentropy' })
+
+  // We parameterize batch size as a fraction of the entire dataset because the
+  // number of examples that are collected depends on how many examples the user
+  // collects. This allows us to have a flexible batch size.
+  const batchSize
+      = Math.floor(controllerDataset.xs.shape[0] * trainSetting.value.batchSize)
+  if (!(batchSize > 0)) {
+    throw new Error(
+      'Batch size is 0 or NaN. Please choose a non-zero fraction.')
+  }
+
+  // Train the model! Model.fit() will shuffle xs & ys so we don't have to.
+  sequentialModel.fit(controllerDataset.xs, controllerDataset.ys, {
+    batchSize,
+    epochs: trainSetting.value.epochs,
+    callbacks: {
+      onBatchEnd: async (batch, logs) => {
+        trainSetting.value.status = `Loss: ${logs!.loss.toFixed(5)}`
+      },
+    },
+  })
+}
 </script>
 
 <template>
-  <header>
-    Turn your <b>Web Camera</b> into a controller using a <b>Neural Network</b>.
-  </header>
   <div>
-    <div id="no-webcam" ref="errorInfoRef">
-      No webcam found. <br>
-      To use this demo, use a device with a webcam.
+    <div>
+      <video ref="videoRef" />
+      <div ref="novideoRef" style="display: none;">
+        <p>
+          current browser doesn't support webcam
+        </p>
+      </div>
     </div>
-    <div id="status">
-      Loading mobilenet...
+    <div>
+      <div>
+        <label>units</label>
+        <input v-model="trainSetting.units" type="number">
+      </div>
+      <div>
+        <label>learningRate</label>
+        <input v-model="trainSetting.learningRate" type="number">
+      </div>
+      <div>
+        <label>batchSize</label>
+        <input v-model="trainSetting.batchSize" type="number">
+      </div>
+      <div>
+        <label>epochs</label>
+        <input v-model="trainSetting.epochs" type="number">
+      </div>
     </div>
-
-    <div id="controller" class="controller-panels">
-      <div class="panel training-panel">
-        <!-- Big buttons. -->
-        <div class="panel-row big-buttons">
-          <button id="train">
-            <img width="66" height="66" src="../assets/button.svg">
-            <span id="train-status">TRAIN MODEL</span>
-          </button>
-          <button id="predict">
-            <img width="66" height="66" src="../assets/button.svg">
-            <span>PLAY</span>
-          </button>
-        </div><!-- /.panel-row -->
-
-        <div class="panel-row params-webcam-row">
-          <!-- Hyper params. -->
-          <div class="hyper-params">
-            <!-- Learning rate -->
-            <div class="dropdown">
-              <label>Learning rate</label>
-              <div class="select">
-                <select id="learningRate" v-model="trainingConfig.learningRate">
-                  <option
-                    v-for="item in learningRateOptions" :key="item" :value="item"
-                  >
-                    {{ item }}
-                  </option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Batch size -->
-            <div class="dropdown">
-              <label>Batch size</label>
-              <div class="select">
-                <select
-                  id="batchSizeFraction"
-                  v-model="trainingConfig.batchSize"
-                >
-                  <option
-                    v-for="item in batchSizeOptions" :key="item" :value="item"
-                  >
-                    {{ item }}
-                  </option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Epochs -->
-            <div class="dropdown">
-              <label>Epochs</label>
-              <div class="select">
-                <select
-                  id="epochs"
-                  v-model="trainingConfig.epoch"
-                >
-                  <option
-                    v-for="item in epochOptions" :key="item" :value="item"
-                  >
-                    {{ item }}
-                  </option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Hidden units -->
-            <div class="dropdown">
-              <label>Hidden units</label>
-              <div class="select">
-                <select
-                  id="dense-units"
-                  v-model="trainingConfig.unit"
-                >
-                  <option
-                    v-for="item in unitOptions" :key="item" :value="item"
-                  >
-                    {{ item }}
-                  </option>
-                </select>
-              </div>
-            </div>
-          </div><!-- /.hyper-params -->
-
-          <div class="webcam-box-outer">
-            <div class="webcam-box-inner">
-              <video ref="webcamRef" autoplay playsinline muted width="224" height="224" />
-            </div>
-          </div>
-        </div><!-- /.panel-row -->
-      </div><!-- /.panel -->
-
-      <div class="panel joystick-panel">
-        <div class="panel-row panel-row-top">
-          <ThumbBox :direction="directions.up" @capture="addExample" @cancel="cancelCapture" />
-        </div><!-- /.panel-row -->
-        <div class="panel-row panel-row-middle">
-          <ThumbBox :direction="directions.left" @capture="addExample" @cancel="cancelCapture" />
-          <div class="panel-cell panel-cell-center panel-cell-fill">
-            <img height="108" width="129" src="../assets/joystick.png">
-          </div><!-- ./panel-cell -->
-          <ThumbBox :direction="directions.right" @capture="addExample" @cancel="cancelCapture" />
-        </div><!-- /.panel-row -->
-        <div class="panel-row panel-row-bottom">
-          <ThumbBox :direction="directions.down" @capture="addExample" @cancel="cancelCapture" />
-        </div><!-- /.panel-row -->
-      </div><!-- /.panel -->
-    </div><!-- /#controller -->
   </div>
 </template>
 
 <style scoped>
-html,
-body {
-  background: #2a2a2a;
-  font-family: 'Roboto', sans-serif;
-  margin: 0;
-  padding: 0;
-}
 
-body {
-  display: flex;
-  flex-direction: column;
-}
-
-button:focus {
-  outline: 0;
-}
-
-/** Page header. **/
-header {
-  background-color: #ef6c00;
-  border-bottom: solid 1px rgba(0, 0, 0, 0.4);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 30px;
-  font-weight: 300;
-  line-height: 1.45em;
-  overflow: hidden;
-  padding: 20px 0;
-  position: relative;
-  text-align: center;
-  -webkit-font-smoothing: antialiased;
-}
-
-header b {
-  color: rgba(255, 255, 255, 1);
-  font-weight: 400;
-}
-
-/** Loading message. */
-#status {
-  font-weight: 300;
-  margin: 12px 0;
-  text-align: center;
-}
-
-/** Controls. **/
-.controller-panels {
-  display: flex;
-  flex-direction: row;
-  margin: 9px auto 0;
-}
-
-.panel {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  flex-grow: 1;
-  flex-shrink: 0;
-}
-
-.panel:first-child {
-  border-right: 1px dashed #565656;
-  padding: 0 22px 0 13px;
-  width: 396px;
-}
-
-.panel:last-child {
-  padding: 0 9px 0 22px;
-  width: 353px;
-}
-
-.panel-row {
-  display: flex;
-  flex-direction: row;
-}
-
-.panel-cell {
-  align-items: center;
-  display: flex;
-  flex-direction: column;
-  flex-grow: 0;
-  justify-content: center;
-  position: relative;
-}
-
-.panel-cell-fill {
-  flex-grow: 1;
-}
-
-.panel-cell p {
-  color: #8b8b8b;
-  font-size: 10px;
-  margin: 0;
-  padding: 0;
-  text-align: center;
-}
-
-.controller-panels button {
-  background: none;
-  border: none;
-  box-sizing: border-box;
-  cursor: pointer;
-  margin: 0;
-  padding: 0;
-}
-
-#train-status {
-  width: 124px;
-}
-
-/** Training panel. **/
-.big-buttons {
-  justify-content: space-between;
-}
-
-.big-buttons button {
-  align-items: center;
-  display: flex;
-  flex-direction: row;
-}
-
-.big-buttons button span {
-  border-bottom: 2px solid #484848;
-  border-top: 2px solid #484848;
-  color: #aaa;
-  display: inline-block;
-  font-size: 18px;
-  font-weight: 500;
-  padding: 9px 11px;
-  text-align: left;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.params-webcam-row {
-  align-items: flex-start;
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  margin-top: 35px;
-}
-
-.webcam-box-outer {
-  background: black;
-  border: 1px solid #585858;
-  border-radius: 4px;
-  box-sizing: border-box;
-  display: inline-block;
-  padding: 9px;
-}
-
-.webcam-box-inner {
-  border: 1px solid #585858;
-  border-radius: 4px;
-  box-sizing: border-box;
-  display: flex;
-  justify-content: center;
-  overflow: hidden;
-  width: 160px;
-}
-
-#webcam {
-  height: 160px;
-  transform: scaleX(-1);
-}
-
-.hyper-params {
-  display: flex;
-  flex-direction: column;
-  margin-left: 12px;
-}
-
-.dropdown {
-  flex-direction: column;
-  width: 110px;
-  margin-bottom: 10px;
-}
-
-.dropdown label {
-  color: #777;
-  font-size: 11px;
-  display: block;
-  font-weight: 300;
-  line-height: 1;
-}
-
-.dropdown .select {
-  position: relative;
-}
-
-.dropdown .select select {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background: none;
-  border: none;
-  border-bottom: solid 1px #313131;
-  border-radius: 0;
-  color: #c9c9c9;
-  display: block;
-  font-size: 12px;
-  outline: none;
-  padding: 6px 0;
-  width: 100%;
-}
-
-.dropdown .select::after {
-  content: "▽";
-  color: #999;
-  font-family: 'Material Icons';
-  font-weight: normal;
-  font-style: normal;
-  font-size: 18px;
-  line-height: 1;
-  letter-spacing: normal;
-  text-transform: none;
-  display: inline-block;
-  white-space: nowrap;
-  word-wrap: normal;
-  direction: ltr;
-  position: absolute;
-  right: 0;
-  top: 6px;
-  pointer-events: none;
-}
-
-/** Joystick panel. **/
-.joystick-panel {
-  margin-top: 13px;
-}
-
-.panel-cell .help-text {
-  font-size: 10px;
-  font-style: italic;
-  left: 0;
-  line-height: 1.1;
-  margin: 0;
-  padding: 0;
-  text-align: left;
-  top: 0;
-  position: absolute;
-}
-
-.panel-row-top .panel-cell-left {
-  background: url("../assets/pointer.svg");
-  background-repeat: no-repeat;
-  background-size: 38%;
-  background-position: 98% 46%;
-}
-
-.panel-row-middle .panel-cell {
-  height: 132px;
-}
-
-.panel-row-middle .thumb-box {
-  margin-top: 18px;
-}
-
-/** Footer. **/
-#copyright {
-  color: #f8f8f8;
-  font-weight: 300;
-  margin: 12px 0;
-  text-align: center;
-}
-
-#no-webcam {
-  display: none;
-  text-align: center;
-  font-size: 30px;
-  color: white;
-  padding: 30px;
-  line-height: 30px;
-}
 </style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const props = defineProps({
   direction: String,
+  count: Number,
 })
 
 const emits = defineEmits(['capture', 'cancel'])
@@ -23,7 +24,7 @@ function handleClick() {
         </button>
       </div>
       <p>
-        <span>0</span> examples
+        <span>{{ count || 0 }}</span> examples
       </p>
     </div>
   </div><!-- ./panel-cell -->
