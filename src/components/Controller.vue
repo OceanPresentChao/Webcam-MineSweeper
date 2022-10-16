@@ -1,19 +1,47 @@
 <script setup lang="ts">
 import * as tf from '@tensorflow/tfjs'
+import type { Ref } from 'vue'
 import { ControllerDataset } from '@/utils/ControllerDataset'
-import type { Await, OperationLabel } from '@/utils/type'
+import { OperationLabel } from '@/utils/type'
+import type { Await } from '@/utils/type'
 const videoRef = ref<HTMLVideoElement | null>(null)
 const novideoRef = ref<HTMLDivElement | null>(null)
 let webcam: Await<ReturnType<typeof tf.data.webcam>> | null = null
 let truncatedModel: null | tf.LayersModel = null
 let sequentialModel: null | tf.Sequential = null
-const NUM_CLASSES = 5
+let isPredicting = false
+let isMouseDown = false
+const isReady = ref(false)
+const currentPredict = ref('')
+const CLASSES = {
+  up: {
+    val: OperationLabel.UP,
+    count: 0,
+  },
+  down: {
+    val: OperationLabel.DOWN,
+    count: 0,
+  },
+  left: {
+    val: OperationLabel.LEFT,
+    count: 0,
+  },
+  right: {
+    val: OperationLabel.RIGHT,
+    count: 0,
+  },
+  click: {
+    val: OperationLabel.CLICK,
+    count: 0,
+  },
+}
+const NUM_CLASSES = Object.keys(CLASSES).length
 const controllerDataset = new ControllerDataset(NUM_CLASSES)
 const trainSetting = ref({
-  units: 1,
-  learningRate: 0.3,
-  batchSize: 10,
-  epochs: 5,
+  units: 50,
+  learningRate: 0.01,
+  batchSize: 0.1,
+  epochs: 20,
   status: '',
 })
 onMounted(async () => {
@@ -21,6 +49,13 @@ onMounted(async () => {
     if (videoRef.value) {
       webcam = await tf.data.webcam(videoRef.value)
       truncatedModel = await loadTruncatedMobileNet()
+      isReady.value = true
+      // Warm up the model. This uploads weights to the GPU and compiles the WebGL
+      // programs so the first time we collect data from the webcam it will be
+      // quick.
+      const screenShot = await webcam.capture()
+      truncatedModel.predict(screenShot.expandDims(0))
+      screenShot.dispose()
     }
   }
   catch (e) {
@@ -35,7 +70,7 @@ async function loadTruncatedMobileNet() {
     'https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json')
   const layer = mobilenet.getLayer('conv_pw_13_relu')
   return tf.model({
-    inputs: mobilenet.input,
+    inputs: mobilenet.inputs,
     outputs: layer.output,
   })
 }
@@ -46,17 +81,6 @@ async function getImage() {
     const processedImg = tf.tidy(() => image.expandDims(0).toFloat().div(127).sub(1))
     image.dispose()
     return processedImg
-  }
-}
-
-async function addExample(label: OperationLabel) {
-  if (webcam && truncatedModel) {
-    const image = await webcam.capture()
-    const example = truncatedModel.predict(image)
-    if (example instanceof tf.Tensor) {
-      controllerDataset.addExample(example, label)
-      image.dispose()
-    }
   }
 }
 
@@ -120,22 +144,111 @@ async function train() {
       onBatchEnd: async (batch, logs) => {
         trainSetting.value.status = `Loss: ${logs!.loss.toFixed(5)}`
       },
+      onTrainBegin: () => {
+        trainSetting.value.status = 'training'
+      },
+      onTrainEnd: () => {
+        trainSetting.value.status = 'train finished'
+      },
     },
   })
+}
+
+function predict() {
+  requestAnimationFrame(async () => {
+    if (truncatedModel && sequentialModel && isPredicting) {
+      const img = await getImage()
+      if (img) {
+        const embeddings = truncatedModel.predict(img)
+        const predictions = sequentialModel.predict(embeddings)
+        if (predictions instanceof tf.Tensor) {
+          const predictedClass = predictions.as1D().argMax()
+          const classId = (await predictedClass.data())[0]
+          currentPredict.value = OperationLabel[classId]
+          img.dispose()
+          await tf.nextFrame()
+          requestAnimationFrame(predict)
+        }
+      }
+      else {
+        throw new Error('error when getting image')
+      }
+    }
+  })
+}
+
+async function addExample(label: OperationLabel) {
+  if (webcam && truncatedModel) {
+    const image = await getImage()
+    if (image) {
+      const example = truncatedModel.predict(image)
+      if (example instanceof tf.Tensor) {
+        controllerDataset.addExample(example, label)
+        image.dispose()
+      }
+    }
+    else {
+      throw new Error('error when getting image')
+    }
+  }
+  else {
+    throw new Error('model is not ready')
+  }
+}
+
+function startPredict() {
+  trainSetting.value.status = 'predicting'
+  isPredicting = true
+  predict()
+}
+
+async function startTrain() {
+  isPredicting = false
+  await train()
+}
+
+async function mouseDownHandler(key: keyof typeof CLASSES) {
+  isMouseDown = true
+  const labelRef = document.getElementById(`total${key}`)
+  // eslint-disable-next-line no-unmodified-loop-condition
+  while (isMouseDown) {
+    await addExample(CLASSES[key].val)
+    CLASSES[key].count++
+    if (labelRef)
+      labelRef.innerText = String(CLASSES[key].count)
+    await tf.nextFrame()
+  }
+}
+
+function mouseUpHandler() {
+  isMouseDown = false
 }
 </script>
 
 <template>
   <div>
     <div>
-      <video ref="videoRef" />
+      <video ref="videoRef" width="224" height="224" />
       <div ref="novideoRef" style="display: none;">
         <p>
           current browser doesn't support webcam
         </p>
       </div>
     </div>
-    <div>
+    <div v-show="!isReady">
+      <p>
+        load model....
+      </p>
+    </div>
+    <div v-show="isReady">
+      <div>
+        <p>
+          training status:{{ trainSetting.status }}
+        </p>
+        <p>
+          current predict:{{ currentPredict }}
+        </p>
+      </div>
       <div>
         <label>units</label>
         <input v-model="trainSetting.units" type="number">
@@ -151,6 +264,25 @@ async function train() {
       <div>
         <label>epochs</label>
         <input v-model="trainSetting.epochs" type="number">
+      </div>
+      <div>
+        <button @click="startTrain">
+          train
+        </button>
+        <button @click="startPredict">
+          predict
+        </button>
+      </div>
+      <div>
+        <div v-for="(val, key) in CLASSES" :key="key">
+          <!-- <label>{{ key }}</label> -->
+          <!-- <canvas height="224" width="224" /> -->
+          <label>count:</label>
+          <label :id="`total${key}`">0</label>
+          <button @mousedown="mouseDownHandler(key)" @mouseup="mouseUpHandler">
+            click to get label {{ key }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
