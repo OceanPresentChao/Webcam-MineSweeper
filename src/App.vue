@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import Controller from './components/Controller.vue'
 </script>
 
 <template>
   <main>
-    <Controller />
+    <WebcamNN />
   </main>
 </template>
 

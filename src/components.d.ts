@@ -4,8 +4,7 @@
 
 declare module 'vue' {
   export interface GlobalComponents {
-    Controller: typeof import('./components/Controller.vue')['default']
-    ThumbBox: typeof import('./components/ThumbBox.vue')['default']
+    WebcamNN: typeof import('./components/WebcamNN.vue')['default']
   }
 }
 
