@@ -33,6 +33,7 @@
   "dependencies": {
     "@tensorflow/tfjs": "^3.19.0",
     "@vueuse/core": "^8.9.4",
+    "mitt": "^3.0.0",
     "seedrandom": "^3.0.5",
     "vue": "^3.2.37"
   },

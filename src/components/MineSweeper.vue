@@ -1,0 +1,164 @@
+<script setup lang="ts">
+import { GameController } from '@/utils/GameController'
+import { GameStatus, OperationLabel } from '@/utils/type'
+
+interface InputOptions {
+  width: number
+  height: number
+  mine: number
+}
+interface Records {
+  [option: string]: Array<number>
+}
+
+const options = ref<InputOptions>({
+  width: 5,
+  height: 5,
+  mine: 5,
+})
+const Game = ref<GameController>(new GameController(options.value))
+
+const activeOne = ref({
+  x: 0,
+  y: 0,
+})
+
+const time = ref(0)
+let timer = -1
+
+const records = useLocalStorage('mine-records', {} as Records)
+const { proxy } = getCurrentInstance()!
+const emitter = proxy!.$mitt
+
+emitter.on('predict', (label) => {
+  if (Game.value && (Game.value.status === GameStatus.RUNNING || Game.value.status === GameStatus.STOP)) {
+    if (label === OperationLabel.LEFT)
+      activeOne.value.x = activeOne.value.x === 0 ? 0 : activeOne.value.x - 1
+    if (label === OperationLabel.RIGHT)
+      activeOne.value.x = activeOne.value.x === Game.value.width - 1 ? Game.value.width - 1 : activeOne.value.x + 1
+    if (label === OperationLabel.UP)
+      activeOne.value.y = activeOne.value.y === 0 ? 0 : activeOne.value.y - 1
+    if (label === OperationLabel.DOWN)
+      activeOne.value.y = activeOne.value.y === Game.value.height - 1 ? Game.value.height - 1 : activeOne.value.y + 1
+    if (label === OperationLabel.CLICK)
+      Game.value.openBlock(Game.value.blocks[activeOne.value.x][activeOne.value.y])
+  }
+})
+
+watch(() => Game.value.status, (v) => {
+  emitter.emit('gameStatusChange', v)
+  if (v === GameStatus.RUNNING) {
+    time.value = 0
+    timer = setInterval(() => {
+      time.value++
+    }, 1000)
+  }
+  else {
+    clearInterval(timer)
+    if (v === GameStatus.WIN) {
+      if (!records.value[JSON.stringify(options.value)]) {
+        records.value[JSON.stringify(options.value)] = []
+      }
+      else {
+        records.value[JSON.stringify(options.value)].push(time.value)
+        records.value[JSON.stringify(options.value)].sort()
+      }
+    }
+  }
+})
+
+function createGame() {
+  if (options.value.mine >= options.value.height * options.value.width)
+    options.value.mine = options.value.height * options.value.width - 1
+  if (options.value.mine <= 0)
+    options.value.mine = 1
+  if (!records.value[JSON.stringify(options.value)])
+    records.value[JSON.stringify(options.value)] = []
+  Game.value = new GameController(options.value)
+}
+</script>
+
+<template>
+  <div class="flex flex-nowrap justify-center">
+    <div class="flex-none mr-auto">
+      <div class="m-1">
+        <button class="border-yellow-400 text-yellow-500 border-2 p-1 rounded-md" @click="createGame">
+          click to
+          start
+        </button>
+      </div>
+      <div class="m-1">
+        <input v-model="options.width" type="number" placeholder="width" :min="1" :step="1" class="input-props">
+      </div>
+      <div class="m-1">
+        <input
+          v-model="options.height" type="number" placeholder="height" :min="1" :step="1"
+          class="input-props"
+        >
+      </div>
+      <div class="m-1">
+        <input v-model="options.mine" type="number" placeholder="mine" :min="1" :step="1" class="input-props">
+      </div>
+    </div>
+    <div class="flex-1">
+      <template v-if="Game">
+        <div class="text-center">
+          <button
+            :disabled="Game.status !== GameStatus.RUNNING" class="border-red-400 text-red-500 border-2 p-1 rounded-md"
+            @click="Game?.toggleCheat"
+          >
+            toggle cheat
+          </button>
+          <p>
+            Time: {{ time }}
+          </p>
+          <p>
+            Remaining Mines: {{ Game.remaining }}
+          </p>
+        </div>
+        <div class="flex items-center justify-center">
+          <div v-for="(row, x) in Game?.blocks" :key="x" class="flex items-center justify-center flex-col">
+            <MineBlock
+              v-for="(block, y) in row" :key="x * Game.height + y"
+              :block="block"
+              :is-cheat="Game.isCheat"
+              :class="{ active: block.x === activeOne.x && block.y === activeOne.y }"
+              @lclick="Game?.openBlock(block)"
+              @lrclick="Game?.autoOpen(block)"
+              @rclick="Game?.setFlag(block)"
+              @contextmenu.prevent="function(){}"
+            />
+          </div>
+        </div>
+        <div>
+          <p>
+            Your Records in
+            <br>
+            Game(width:{{ options.width }},height:{{ options.height }},mine:{{ options.mine }}):
+            <br>
+            {{ records[JSON.stringify(options)] }}
+          </p>
+        </div>
+      </template>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.input-props {
+  padding: 0.25rem;
+  font-size: large;
+}
+
+.input-props:focus {
+  border-color: #66afe9;
+  border-radius: 5%;
+  outline: 0;
+  -webkit-box-shadow: inset 0 1px 1px rgba(0, 0, 0, .075), 0 0 8px rgba(102, 175, 233, .6);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, .075), 0 0 8px rgba(102, 175, 233, .6)
+}
+
+.active {
+  border: 2px solid salmon;
+}
+</style>

@@ -1,0 +1,14 @@
+<script setup lang="ts">
+
+</script>
+
+<template>
+  <div class="flex justify-center items-center">
+    <WebcamNN />
+    <MineSweeper />
+  </div>
+</template>
+
+<style scoped>
+
+</style>

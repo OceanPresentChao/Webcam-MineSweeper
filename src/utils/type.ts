@@ -31,3 +31,9 @@ export interface GameOptions {
   height?: number
   mine?: number
 }
+
+// eslint-disable-next-line @typescript-eslint/consistent-type-definitions
+export type MittEvent = {
+  predict: OperationLabel
+  gameStatusChange: GameStatus
+}

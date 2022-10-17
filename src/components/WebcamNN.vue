@@ -9,9 +9,10 @@ const novideoRef = ref<HTMLDivElement | null>(null)
 let webcam: Webcam | null = null
 let truncatedModel: null | tf.LayersModel = null
 let sequentialModel: null | tf.Sequential = null
-let isPredicting = false
-let isMouseDown = false
+const isPredicting = ref(false)
 const isReady = ref(false)
+const isTrained = ref(false)
+let isMouseDown = false
 const currentPredict = ref('')
 const CLASSES = {
   up: {
@@ -46,6 +47,15 @@ const trainSetting = ref<TrainingSetting>({
   status: '',
 })
 const controllerDataset = new ControllerDataset(trainSetting.value.classnum)
+const { proxy } = getCurrentInstance()!
+const emitter = proxy!.$mitt
+emitter.on('gameStatusChange', (status) => {
+  if (status && isTrained.value)
+    startPredict()
+  else if (!status)
+    stopPredcit()
+})
+
 onMounted(async () => {
   try {
     if (videoRef.value) {
@@ -89,7 +99,13 @@ function predict() {
       const img = getProcessedImage(rawimg)
       if (img) {
         const classId = await predictImage(truncatedModel, sequentialModel, img)
-        currentPredict.value = OperationLabel[classId!]
+        if (classId) {
+          currentPredict.value = OperationLabel[classId!]
+          emitter.emit('predict', classId)
+        }
+        else {
+          console.warn('predict nothing')
+        }
         img.dispose()
         await tf.nextFrame()
         requestAnimationFrame(predict)
@@ -103,15 +119,21 @@ function predict() {
 
 function startPredict() {
   trainSetting.value.status = 'predicting'
-  isPredicting = true
+  isPredicting.value = true
   predict()
+}
+
+function stopPredcit() {
+  trainSetting.value.status = 'stop'
+  isPredicting.value = false
 }
 
 async function startTrain() {
   if (truncatedModel) {
-    isPredicting = false
+    isPredicting.value = false
     modifySetting()
     sequentialModel = await trainModel(controllerDataset, truncatedModel, trainSetting.value)
+    isTrained.value = true
   }
   else {
     throw new Error('model is not ready')
@@ -187,8 +209,11 @@ function mouseUpHandler() {
         <button @click="startTrain">
           train
         </button>
-        <button @click="startPredict">
+        <button :disabled="isPredicting || !isTrained" @click="startPredict">
           predict
+        </button>
+        <button :disabled="!isPredicting" @click="stopPredcit">
+          stop
         </button>
       </div>
       <div>
@@ -198,7 +223,7 @@ function mouseUpHandler() {
           <label>count:</label>
           <label :id="`total${key}`">0</label>
           <button @mousedown="mouseDownHandler(key)" @mouseup="mouseUpHandler">
-            click to get label {{ key }}
+            get label {{ key }}
           </button>
         </div>
       </div>
