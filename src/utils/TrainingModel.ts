@@ -18,13 +18,10 @@ export async function trainModel(controllerDataset: ControllerDataset, truncated
   if (!truncatedModel)
     throw new Error('truncatedModel not exist')
   // Creates a 2-layer fully connected model. By creating a separate model,
-  // rather than adding layers to the mobilenet model, we "freeze" the weights
-  // of the mobilenet model, and only train weights from the new model.
+  // rather than adding layers to the mobilenet model, we "freeze" the weights of the mobilenet model, and only train weights from the new model.
   const sequentialModel = tf.sequential({
     layers: [
-      // Flattens the input to a vector so we can use it in a dense layer. While
-      // technically a layer, this only performs a reshape (and has no training
-      // parameters).
+      // Flattens the input to a vector so we can use it in a dense layer. While technically a layer, this only performs a reshape (and has no training  parameters).
       tf.layers.flatten({
         inputShape: truncatedModel.outputs[0].shape.slice(1),
       }),
@@ -48,15 +45,11 @@ export async function trainModel(controllerDataset: ControllerDataset, truncated
   // Creates the optimizers which drives training of the model.
   const optimizer = tf.train.adam(config.learningRate)
   // We use categoricalCrossentropy which is the loss function we use for
-  // categorical classification which measures the error between our predicted
-  // probability distribution over classes (probability that an input is of each
-  // class), versus the label (100% probability in the true class)>
+  // categorical classification which measures the error between our predicted  probability distribution over classes (probability that an input is of each class), versus the label (100% probability in the true class)>
   sequentialModel.compile({ optimizer, loss: 'categoricalCrossentropy' })
 
-  // We parameterize batch size as a fraction of the entire dataset because the
-  // number of examples that are collected depends on how many examples the user
-  // collects. This allows us to have a flexible batch size.
-  const batchSize = Math.floor(controllerDataset.xs.shape[0] * config.batchSize)
+  // We parameterize batch size as a fraction of the entire dataset because the number of examples that are collected depends on how many examples the user collects. This allows us to have a flexible batch size.
+  const batchSize = Math.min(controllerDataset.xs.shape[0], config.batchSize)
   if (!(batchSize > 0)) {
     throw new Error(
       'Batch size is 0 or NaN. Please choose a non-zero fraction.')

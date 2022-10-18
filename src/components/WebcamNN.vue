@@ -92,28 +92,33 @@ async function addExample(label: OperationLabel) {
   }
 }
 
+let lastTime = 0
 function predict() {
-  requestAnimationFrame(async () => {
-    if (truncatedModel && sequentialModel && isPredicting && webcam) {
-      const rawimg = await webcam.capture()
-      const img = getProcessedImage(rawimg)
-      if (img) {
-        const classId = await predictImage(truncatedModel, sequentialModel, img)
-        if (classId) {
-          currentPredict.value = OperationLabel[classId!]
-          emitter.emit('predict', classId)
+  requestAnimationFrame(async (time) => {
+    if (time - lastTime > 1000) {
+      lastTime = time
+      if (truncatedModel && sequentialModel && webcam) {
+        const rawimg = await webcam.capture()
+        const img = getProcessedImage(rawimg)
+        if (img) {
+          const classId = await predictImage(truncatedModel, sequentialModel, img)
+          if (classId) {
+            currentPredict.value = OperationLabel[classId!]
+            emitter.emit('predict', classId)
+          }
+          else {
+            console.warn('predict nothing')
+          }
+          img.dispose()
+          await tf.nextFrame()
         }
         else {
-          console.warn('predict nothing')
+          throw new Error('error when getting image')
         }
-        img.dispose()
-        await tf.nextFrame()
-        requestAnimationFrame(predict)
-      }
-      else {
-        throw new Error('error when getting image')
       }
     }
+    if (isPredicting)
+      requestAnimationFrame(predict)
   })
 }
 
@@ -167,64 +172,65 @@ function mouseUpHandler() {
 
 <template>
   <div>
-    <div>
-      <video ref="videoRef" width="224" height="224" />
+    <div class="m-2">
+      <video ref="videoRef" width="224" height="224" class="m-auto" />
       <div ref="novideoRef" style="display: none;">
-        <p>
+        <p class="text-2xl">
           current browser doesn't support webcam
         </p>
       </div>
     </div>
-    <div v-show="!isReady">
-      <p>
+    <div v-show="!isReady" class="text-center">
+      <p class="text-xl">
         load model....
       </p>
     </div>
     <div v-show="isReady">
       <div>
-        <p>
-          training status:{{ trainSetting.status }}
+        <p class="text-lg">
+          Training Status:{{ trainSetting.status }}
         </p>
-        <p>
-          current predict:{{ currentPredict }}
+        <p class="text-lg">
+          Current Predict:{{ currentPredict }}
         </p>
       </div>
-      <div>
-        <label>units</label>
+      <div class="grid grid-cols-2">
+        <label class="text-lg">Units</label>
         <input v-model="trainSetting.units" type="number">
-      </div>
-      <div>
-        <label>learningRate</label>
+        <label class="text-lg">LearningRate</label>
         <input v-model="trainSetting.learningRate" type="number">
-      </div>
-      <div>
-        <label>batchSize</label>
+        <label class="text-lg">BatchSize</label>
         <input v-model="trainSetting.batchSize" type="number">
-      </div>
-      <div>
-        <label>epochs</label>
+        <label class="text-lg">Epochs</label>
         <input v-model="trainSetting.epochs" type="number">
       </div>
-      <div>
-        <button @click="startTrain">
-          train
-        </button>
-        <button :disabled="isPredicting || !isTrained" @click="startPredict">
-          predict
-        </button>
-        <button :disabled="!isPredicting" @click="stopPredcit">
-          stop
-        </button>
+
+      <div class="grid grid-cols-2 justify-items-center my-2">
+        <div>
+          <button class="text-red-500" @click="startTrain">
+            Train
+          </button>
+        </div>
+        <div>
+          <button v-if="!isPredicting" :disabled="!isTrained" class="text-blue-500" @click="startPredict">
+            Predict
+          </button>
+          <button v-if="isPredicting" class="text-blue-500" @click="stopPredcit">
+            Stop
+          </button>
+        </div>
       </div>
       <div>
-        <div v-for="(val, key) in CLASSES" :key="key">
+        <div v-for="(val, key) in CLASSES" :key="key" class="text-yellow-500 m-2 grid grid-cols-2 justify-items-center">
           <!-- <label>{{ key }}</label> -->
           <!-- <canvas height="224" width="224" /> -->
-          <label>count:</label>
-          <label :id="`total${key}`">0</label>
           <button @mousedown="mouseDownHandler(key)" @mouseup="mouseUpHandler">
-            get label {{ key }}
+            Get {{ key }} Sample
           </button>
+          <div>
+            <label>count:</label>
+            <label :id="`total${key}`">0</label>
+          </div>
         </div>
       </div>
     </div>
@@ -232,5 +238,21 @@ function mouseUpHandler() {
 </template>
 
 <style scoped>
+input{
+  padding: 0.25rem 0.5rem;
+  margin: 0 0.25rem;
+  border: 1px solid coral;
+  border-radius: 0.5rem;
+}
 
+button{
+  border: 1px currentColor solid;
+  border-radius: 0.5rem;
+  padding: 0.25rem 0.5rem;
+}
+
+button:disabled{
+  cursor: no-drop;
+  color:gray;
+}
 </style>

@@ -79,35 +79,34 @@ function createGame() {
 </script>
 
 <template>
-  <div class="flex flex-nowrap justify-center">
-    <div class="flex-none mr-auto">
-      <div class="m-1">
-        <button class="border-yellow-400 text-yellow-500 border-2 p-1 rounded-md" @click="createGame">
-          click to
-          start
+  <div class="flex justify-center flex-wrap items-center">
+    <div class="flex-none ">
+      <div class=" text-center">
+        <button class="border-yellow-400 text-yellow-500 border-2 p-1 m-2 rounded-md" @click="createGame">
+          Start Game
         </button>
       </div>
-      <div class="m-1">
+      <div>
         <input v-model="options.width" type="number" placeholder="width" :min="1" :step="1" class="input-props">
       </div>
-      <div class="m-1">
+      <div>
         <input
           v-model="options.height" type="number" placeholder="height" :min="1" :step="1"
           class="input-props"
         >
       </div>
-      <div class="m-1">
+      <div>
         <input v-model="options.mine" type="number" placeholder="mine" :min="1" :step="1" class="input-props">
       </div>
     </div>
-    <div class="flex-1">
+    <div class="flex-1 text-center">
       <template v-if="Game">
-        <div class="text-center">
+        <div>
           <button
             :disabled="Game.status !== GameStatus.RUNNING" class="border-red-400 text-red-500 border-2 p-1 rounded-md"
             @click="Game?.toggleCheat"
           >
-            toggle cheat
+            Toggle Cheat
           </button>
           <p>
             Time: {{ time }}
@@ -148,17 +147,17 @@ function createGame() {
 .input-props {
   padding: 0.25rem;
   font-size: large;
+  border: #248fe6 1px solid;
+  border-radius: 0.5rem;
 }
 
 .input-props:focus {
-  border-color: #66afe9;
-  border-radius: 5%;
   outline: 0;
   -webkit-box-shadow: inset 0 1px 1px rgba(0, 0, 0, .075), 0 0 8px rgba(102, 175, 233, .6);
   box-shadow: inset 0 1px 1px rgba(0, 0, 0, .075), 0 0 8px rgba(102, 175, 233, .6)
 }
 
 .active {
-  border: 2px solid salmon;
+  border: 2px solid rgb(86, 244, 128);
 }
 </style>
