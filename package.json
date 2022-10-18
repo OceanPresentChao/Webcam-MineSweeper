@@ -1,24 +1,24 @@
 {
-  "name": "starter-unplugin",
+  "name": "webcam-minesweeper",
   "version": "0.0.0",
   "author": "OceanPresent <oceanpresent@163.com>",
   "license": "MIT",
-  "homepage": "https://github.com/OceanPresentChao/[[name]]",
+  "homepage": "https://github.com/OceanPresentChao/Webcam-Minesweeper",
   "repository": {
     "type": "git",
-    "url": "https://github.com/OceanPresentChao/[[name]].git"
+    "url": "https://github.com/OceanPresentChao/Webcam-Minesweeper.git"
   },
   "keywords": [
     "oceanpresent"
   ],
   "exports": {
     ".": {
-      "require": "./dist/[[name]].umd.js",
-      "import": "./dist/[[name]].es.js"
+      "require": "./dist/webcam-minesweeper.umd.js",
+      "import": "./dist/webcam-minesweeper.es.js"
     }
   },
-  "main": "./dist/[[name]].umd.js",
-  "module": "./dist/[[name]].es.js",
+  "main": "./dist/webcam-minesweeper.umd.js",
+  "module": "./dist/webcam-minesweeper.es.js",
   "files": [
     "dist"
   ],
