@@ -1,6 +1,10 @@
 <script setup lang="ts">
+import SpritesJSON from '@/assets/sprites.json'
 import { GameController } from '@/utils/GameController'
+import type { AudioSprite } from '@/utils/type'
 import { GameStatus, OperationLabel } from '@/utils/type'
+import { AudioPlayer } from '@/utils/audio'
+import audiosprite from '@/assets/audiosprite.mp3'
 
 interface InputOptions {
   width: number
@@ -10,7 +14,6 @@ interface InputOptions {
 interface Records {
   [option: string]: Array<number>
 }
-
 const options = ref<InputOptions>({
   width: 5,
   height: 5,
@@ -25,6 +28,11 @@ const activeOne = ref({
 
 const time = ref(0)
 let timer = -1
+const sprites: Record<string, AudioSprite> = {}
+SpritesJSON.forEach((s: any) => {
+  sprites[s.name] = s
+})
+const audioPlayer = new AudioPlayer(sprites, audiosprite)
 
 const records = useLocalStorage('mine-records', {} as Records)
 const { proxy } = getCurrentInstance()!
@@ -63,6 +71,10 @@ watch(() => Game.value.status, (v) => {
         records.value[JSON.stringify(options.value)].push(time.value)
         records.value[JSON.stringify(options.value)].sort()
       }
+      audioPlayer.play('gameWin')
+    }
+    else {
+      audioPlayer.play('gameLose')
     }
   }
 })
@@ -75,6 +87,27 @@ function createGame() {
   if (!records.value[JSON.stringify(options.value)])
     records.value[JSON.stringify(options.value)] = []
   Game.value = new GameController(options.value)
+}
+
+function handleLClick(block: any) {
+  if (Game.value) {
+    Game.value.openBlock(block)
+    audioPlayer.play('btnClick')
+  }
+}
+
+function handleLRClick(block: any) {
+  if (Game.value) {
+    Game.value.autoOpen(block)
+    audioPlayer.play('btnClick')
+  }
+}
+
+function handleRClick(block: any) {
+  if (Game.value) {
+    Game.value.setFlag(block)
+    audioPlayer.play('btnClick')
+  }
 }
 </script>
 
@@ -122,9 +155,9 @@ function createGame() {
               :block="block"
               :is-cheat="Game.isCheat"
               :class="{ active: block.x === activeOne.x && block.y === activeOne.y }"
-              @lclick="Game?.openBlock(block)"
-              @lrclick="Game?.autoOpen(block)"
-              @rclick="Game?.setFlag(block)"
+              @lclick="handleLClick(block)"
+              @lrclick="handleLRClick(block)"
+              @rclick="handleRClick(block)"
               @contextmenu.prevent="function(){}"
             />
           </div>

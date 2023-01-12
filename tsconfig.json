@@ -18,7 +18,8 @@
     },
     "target": "ESNext",
     "lib": [
-      "ESNext"
+      "ESNext",
+      "DOM"
     ]
   },
   "references": [

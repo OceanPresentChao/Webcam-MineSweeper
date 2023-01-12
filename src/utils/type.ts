@@ -37,3 +37,11 @@ export type MittEvent = {
   predict: OperationLabel
   gameStatusChange: GameStatus
 }
+
+export interface AudioSprite {
+  id: number
+  name: string
+  start: number
+  end: number
+  length: number
+}
