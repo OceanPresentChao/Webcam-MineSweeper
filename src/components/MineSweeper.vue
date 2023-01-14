@@ -32,7 +32,7 @@ const sprites: Record<string, AudioSprite> = {}
 SpritesJSON.forEach((s: any) => {
   sprites[s.name] = s
 })
-const audioPlayer = new AudioPlayer(sprites, audiosprite)
+const audioPlayer = ref(new AudioPlayer(sprites, audiosprite))
 
 const records = useLocalStorage('mine-records', {} as Records)
 const { proxy } = getCurrentInstance()!
@@ -71,10 +71,10 @@ watch(() => Game.value.status, (v) => {
         records.value[JSON.stringify(options.value)].push(time.value)
         records.value[JSON.stringify(options.value)].sort()
       }
-      audioPlayer.play('gameWin')
+      audioPlayer.value.play('gameWin')
     }
     else {
-      audioPlayer.play('gameLose')
+      audioPlayer.value.play('gameLose')
     }
   }
 })
@@ -92,27 +92,28 @@ function createGame() {
 function handleLClick(block: any) {
   if (Game.value) {
     Game.value.openBlock(block)
-    audioPlayer.play('btnClick')
+    audioPlayer.value.play('btnClick')
   }
 }
 
 function handleLRClick(block: any) {
   if (Game.value) {
     Game.value.autoOpen(block)
-    audioPlayer.play('btnClick')
+    audioPlayer.value.play('btnClick')
   }
 }
 
 function handleRClick(block: any) {
   if (Game.value) {
     Game.value.setFlag(block)
-    audioPlayer.play('btnClick')
+    audioPlayer.value.play('btnClick')
   }
 }
 </script>
 
 <template>
   <div class="flex justify-center flex-wrap items-center">
+    <Menu v-model:cheat="Game.isCheat" v-model:volume="audioPlayer.volume" />
     <div class="flex-none ">
       <div class=" text-center">
         <button class="border-yellow-400 text-yellow-500 border-2 p-1 m-2 rounded-md" @click="createGame">
@@ -135,12 +136,6 @@ function handleRClick(block: any) {
     <div class="flex-1 text-center">
       <template v-if="Game">
         <div>
-          <button
-            :disabled="Game.status !== GameStatus.RUNNING" class="border-red-400 text-red-500 border-2 p-1 rounded-md"
-            @click="Game?.toggleCheat"
-          >
-            Toggle Cheat
-          </button>
           <p>
             Time: {{ time }}
           </p>

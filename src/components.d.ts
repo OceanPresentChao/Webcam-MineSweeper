@@ -5,6 +5,7 @@
 declare module 'vue' {
   export interface GlobalComponents {
     Game: typeof import('./components/Game.vue')['default']
+    Menu: typeof import('./components/Menu.vue')['default']
     MineBlock: typeof import('./components/MineBlock.vue')['default']
     MineSweeper: typeof import('./components/MineSweeper.vue')['default']
     WebcamNN: typeof import('./components/WebcamNN.vue')['default']
